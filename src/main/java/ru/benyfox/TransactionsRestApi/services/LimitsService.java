@@ -14,8 +14,8 @@ import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotFound
 import ru.benyfox.TransactionsRestApi.models.Limits.Limit;
 import ru.benyfox.TransactionsRestApi.models.Limits.ProductsLimits;
 import ru.benyfox.TransactionsRestApi.models.Limits.ServicesLimits;
-import ru.benyfox.TransactionsRestApi.repositories.ProductsLimitsRepository;
-import ru.benyfox.TransactionsRestApi.repositories.ServicesLimitsRepository;
+import ru.benyfox.TransactionsRestApi.repositories.jpa.ProductsLimitsRepository;
+import ru.benyfox.TransactionsRestApi.repositories.jpa.ServicesLimitsRepository;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

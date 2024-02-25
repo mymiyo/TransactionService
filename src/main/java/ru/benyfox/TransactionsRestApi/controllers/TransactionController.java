@@ -2,11 +2,13 @@ package ru.benyfox.TransactionsRestApi.controllers;
 
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import ru.benyfox.TransactionsRestApi.dto.Transaction.TransactionDTO;
+import ru.benyfox.TransactionsRestApi.enums.ExpenseCategory;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionErrorResponse;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotCreatedException;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotFoundException;
@@ -17,6 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/transactions")
 @AllArgsConstructor
+
 public class TransactionController {
     private final TransactionService transactionService;
 
@@ -28,6 +31,11 @@ public class TransactionController {
     @GetMapping("/{id}")
     public TransactionDTO getTransaction(@PathVariable int id) {
         return transactionService.findOne(id);
+    }
+
+    @GetMapping("/{accountNumber}/{category}/exceeded")
+    public List<TransactionDTO> getExceededTransactions(@PathVariable String accountNumber, @PathVariable ExpenseCategory category) {
+        return transactionService.findExceeded(accountNumber, category);
     }
 
     @PostMapping

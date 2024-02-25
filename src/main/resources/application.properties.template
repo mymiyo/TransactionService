@@ -1,0 +1,14 @@
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.datasource.url=jdbc:
+spring.datasource.username=
+spring.datasource.password=
+
+spring.jpa.properties.hibernate.show_sql=true
+spring.jpa.hibernate.ddl-auto=update
+spring.mvc.hiddenmethod.filter.enabled=true
+
+spring.data.cassandra.keyspace-name=mykeyspace
+spring.data.cassandra.port=9042
+spring.data.cassandra.contact-points=127.0.0.1
+
+twelvedata.api.key=
