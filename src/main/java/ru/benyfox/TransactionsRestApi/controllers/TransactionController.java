@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import ru.benyfox.TransactionsRestApi.dto.Transaction.TransactionDTO;
+import ru.benyfox.TransactionsRestApi.dto.Transaction.TransactionOverdraftDTO;
 import ru.benyfox.TransactionsRestApi.enums.ExpenseCategory;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionErrorResponse;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotCreatedException;
@@ -15,6 +16,7 @@ import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotFound
 import ru.benyfox.TransactionsRestApi.services.TransactionService;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/transactions")
@@ -33,9 +35,9 @@ public class TransactionController {
         return transactionService.findOne(id);
     }
 
-    @GetMapping("/{accountNumber}/{category}/exceeded")
-    public List<TransactionDTO> getExceededTransactions(@PathVariable String accountNumber, @PathVariable ExpenseCategory category) {
-        return transactionService.findExceeded(accountNumber, category);
+    @GetMapping("/{accountNumber}/exceeded")
+    public Set<TransactionOverdraftDTO> getExceededTransactions(@PathVariable int accountNumber) {
+        return transactionService.findExceeded(accountNumber);
     }
 
     @PostMapping

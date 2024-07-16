@@ -7,18 +7,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
+import ru.benyfox.TransactionsRestApi.dto.Limit.ExceededLimitDto;
 import ru.benyfox.TransactionsRestApi.dto.Transaction.TransactionDTO;
-import ru.benyfox.TransactionsRestApi.enums.ExpenseCategory;
+import ru.benyfox.TransactionsRestApi.dto.Transaction.TransactionOverdraftDTO;
+import ru.benyfox.TransactionsRestApi.exceptions.ExchangeRate.ExchangeRateNotFoundException;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotCreatedException;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotFoundException;
+import ru.benyfox.TransactionsRestApi.models.ExchangeRate;
 import ru.benyfox.TransactionsRestApi.models.Limits.Limit;
 import ru.benyfox.TransactionsRestApi.models.Transaction;
 import ru.benyfox.TransactionsRestApi.repositories.jpa.TransactionRepository;
-import ru.benyfox.TransactionsRestApi.util.TransactionValidator;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,9 +31,9 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @Slf4j
 public class TransactionService {
+    private final ExchangePairsService exchangePairsService;
     private final TransactionRepository transactionRepository;
-    private final TransactionValidator transactionValidator;
-    private final LimitsService limitsService;
+    private final LimitService limitService;
     private final ModelMapper modelMapper;
 
     public List<Transaction> findAll() {
@@ -36,38 +41,22 @@ public class TransactionService {
     }
 
     public TransactionDTO findOne(int id) {
-        return convertToTransactionDTO(transactionRepository.findById(id).orElseThrow(TransactionNotFoundException::new));
+        return convertToTransactionDTO(transactionRepository.findById(id)
+                .orElseThrow(TransactionNotFoundException::new));
     }
 
-    public List<TransactionDTO> findExceeded(String accountNumber, ExpenseCategory category) {
-            Limit limit = limitsService.findOneByAccountName(category, accountNumber);
 
-            OffsetDateTime limitValidFrom = limit.getLimitDatetime().minusSeconds(1); // Adjust as needed
-            List<Transaction> transactions = transactionRepository
-                    .findExceededByDate(accountNumber, limitValidFrom);
+    public Set<TransactionOverdraftDTO> findExceeded(int accountNumber) {
+        List<Limit> exceededLimits = limitService.findAllExceededLimitsByAccountNumber(accountNumber);
 
-            log.info(transactions.toString());
-
-            long total = limit.getLimitSum();
-            Deque<Transaction> exceededTransactions = new ArrayDeque<>();
-            Iterator<Transaction> it = transactions.iterator();
-            while (it.hasNext() && total > 0) {
-                Transaction transaction = it.next();
-                total -= transaction.getSum();
-                if (total < 0) {
-                    exceededTransactions.addFirst(transaction);
-                }
-            }
-
-            return exceededTransactions.stream()
-                    .map(this::convertToTransactionDTO)
-                    .collect(Collectors.toList());
+        return exceededLimits.stream()
+                .flatMap(limit -> limit.getExceededTransactions().stream()
+                        .map(transaction -> convertToTransactionOverdraftDTO(transaction, limit))) // Преобразуем Transaction в DTO, передавая и limit
+                        .collect(Collectors.toSet());
     }
-
 
     @Transactional
     public void save(TransactionDTO transactionDTO, BindingResult bindingResult) {
-
         Transaction transaction = convertToTransaction(transactionDTO);
         transaction.setDatetime(OffsetDateTime.now(ZoneOffset.UTC));
 
@@ -85,17 +74,50 @@ public class TransactionService {
             throw new TransactionNotCreatedException(errorMessage.toString());
         }
 
+        Limit limit = limitService.findOneByAccountNumber(transaction.getAccountFrom(),
+                transaction.getExpenseCategory());
+        transaction.setLimit(limit);
+
         transactionRepository.save(transaction);
+        checkTransactionForLimit(transaction);
+    }
 
-        Limit currentLimit = limitsService
-                .findOneByAccountName(transaction.getExpenseCategory(), transaction.getAccountFrom());
+    private void checkTransactionForLimit(Transaction transaction) {
+        Limit limit = transaction.getLimit();
 
+        BigDecimal total = transactionRepository.getSumByDateAndExpenseCategory(transaction.getAccountFrom(),
+                limit.getLimitDatetime(),
+                transaction.getExpenseCategory());
 
-        // TODO: сделать конвертацию валют транзакций в доллары (валюта лимита)
-        long total = transactionRepository
-                .findSumByDate(transaction.getAccountFrom(), currentLimit.getLimitDatetime());
+        BigDecimal convertedTotal;
+        try {
+            convertedTotal = convertToLimitCurrencyWithCheck(total,
+                    limit.getLimitCurrencyShortname(),
+                    transaction.getCurrencyShortname());
+        } catch (ExchangeRateNotFoundException e) {
+            throw new TransactionNotCreatedException("The corresponding limit exchange rate was not found" +
+                    " for the transferred transaction");
+        }
 
-        if (total >= currentLimit.getLimitSum()) currentLimit.setLimitExceeded(true);
+        if (convertedTotal.compareTo(limit.getLimitSum()) >= 0) {
+            limit.setLimitExceeded(true);
+            limit.getExceededTransactions().add(transaction);
+        }
+
+        transactionRepository.save(transaction);
+    }
+
+    BigDecimal convertToLimitCurrencyWithCheck(BigDecimal transactionSum,
+                                               String limitCurrency,
+                                               String transactionCurrency) {
+        if (!limitCurrency.equals(transactionCurrency)) {
+            ExchangeRate exchangeRate = exchangePairsService.getLastExchangeRate(
+                    limitCurrency + "/" + transactionCurrency);
+
+            return transactionSum.divide(exchangeRate.getValue(), 3, RoundingMode.HALF_UP);
+        } else {
+            return transactionSum;
+        }
     }
 
     public List<TransactionDTO> getTransactionsList() {
@@ -109,5 +131,15 @@ public class TransactionService {
 
     private TransactionDTO convertToTransactionDTO(Transaction transaction) {
         return modelMapper.map(transaction, TransactionDTO.class);
+    }
+
+    private TransactionOverdraftDTO convertToTransactionOverdraftDTO(Transaction transaction, Limit limit) {
+        TransactionOverdraftDTO dto = modelMapper.map(transaction, TransactionOverdraftDTO.class);
+        dto.setLimit(convertToExceededLimitDTO(limit));
+        return dto;
+    }
+
+    private ExceededLimitDto convertToExceededLimitDTO(Limit limit) {
+        return modelMapper.map(limit, ExceededLimitDto.class);
     }
 }

@@ -8,22 +8,24 @@ import lombok.Getter;
 import lombok.Setter;
 import ru.benyfox.TransactionsRestApi.enums.ExpenseCategory;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
 public class TransactionDTO {
     @Max(value = 9999999999L, message = "The customers account must be in the format of an integer 10 digit number")
-    @Min(value = 1, message = "The customers account must be in the format of an integer 10 digit number") // Другое сообщение не придумал
-    private int accountFrom;
+    @Min(value = 1, message = "The customers account must be in the format of an integer 10 digit number")
+    private Integer accountFrom;
 
     @Max(value = 9999999999L, message = "The counterparts account must be in the format of an integer 10 digit number")
-    @Min(value = 1, message = "The counterparts account must be in the format of an integer 10 digit number") // Другое сообщение не придумал
-    private int accountTo;
+    @Min(value = 1, message = "The counterparts account must be in the format of an integer 10 digit number")
+    private Integer accountTo;
 
     @NotEmpty(message = "The currency of the account must not be empty")
     private String currencyShortname;
 
     @Min(value = 0, message = "Sum should be greater than 0")
-    private long sum;
+    private BigDecimal sum;
 
     @NotNull(message = "The expense category should not be null")
     private ExpenseCategory expenseCategory;

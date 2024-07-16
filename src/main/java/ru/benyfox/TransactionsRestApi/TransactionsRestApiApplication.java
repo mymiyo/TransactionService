@@ -16,6 +16,4 @@ public class TransactionsRestApiApplication {
 
 	@Bean
 	public ModelMapper modelMapper() { return new ModelMapper(); }
-
-
 }

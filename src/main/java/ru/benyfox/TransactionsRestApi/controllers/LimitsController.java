@@ -13,7 +13,7 @@ import ru.benyfox.TransactionsRestApi.enums.ExpenseCategory;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionErrorResponse;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotCreatedException;
 import ru.benyfox.TransactionsRestApi.exceptions.Transaction.TransactionNotFoundException;
-import ru.benyfox.TransactionsRestApi.services.LimitsService;
+import ru.benyfox.TransactionsRestApi.services.LimitService;
 
 import java.util.List;
 
@@ -21,22 +21,22 @@ import java.util.List;
 @RequestMapping("/limits")
 @AllArgsConstructor
 public class LimitsController {
-    private final LimitsService limitsService;
+    private final LimitService limitService;
 
-    @GetMapping("/{category}")
-    public List<LimitResponseDTO> getLimits(@PathVariable ExpenseCategory category) {
-        return limitsService.getLimitsList(category);
+    @GetMapping("/category/{category}")
+    public List<LimitResponseDTO> getLimitsByCategory(@PathVariable ExpenseCategory category) {
+        return limitService.getLimitsList(category);
     }
 
-    @GetMapping("/{category}/{id}")
-    public LimitResponseDTO getLimit(@PathVariable ExpenseCategory category, @PathVariable int id) {
-        return limitsService.findOne(category, id);
+    @GetMapping("/{id}")
+    public LimitResponseDTO getLimit(@PathVariable int id) {
+        return limitService.findOneById(id);
     }
 
     @PostMapping
     public ResponseEntity<HttpStatus> saveLimit(@RequestBody @Valid LimitCreateDTO limitCreateDTO,
                                                       BindingResult bindingResult) {
-        limitsService.save(limitCreateDTO, bindingResult);
+        limitService.save(limitCreateDTO, bindingResult);
         return ResponseEntity.ok(HttpStatus.CREATED);
     }
 

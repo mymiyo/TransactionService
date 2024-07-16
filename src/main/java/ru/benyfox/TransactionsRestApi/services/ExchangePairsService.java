@@ -3,17 +3,18 @@ package ru.benyfox.TransactionsRestApi.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import ru.benyfox.TransactionsRestApi.exceptions.ExchangeRate.ExchangeRateNotFoundException;
 import ru.benyfox.TransactionsRestApi.models.ExchangeRate;
 import ru.benyfox.TransactionsRestApi.repositories.cassandra.ExchangeRateRepository;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Log4j2
-public class GetExchangePairsSchedulerService {
+public class ExchangePairsService {
     private final ExchangeRateRepository rateRepository;
 
     @Value("${twelvedata.api.key}")
@@ -48,9 +49,14 @@ public class GetExchangePairsSchedulerService {
                 throw new RuntimeException("Error getting exchange rate for " + pair + ": " + node.get("message").asText());
             }
 
-            double closeValue = node.get("values").get(0).get("close").asDouble();
+            BigDecimal closeValue = new BigDecimal(node.get("values").get(0).get("close").asText());
 
             rateRepository.save(new ExchangeRate(UUID.randomUUID(), pair, LocalDate.now(), closeValue));
+            log.info("Saved change rate " + closeValue + " for pair: " + pair);
         }
+    }
+
+    public ExchangeRate getLastExchangeRate(String pair) {
+        return rateRepository.findTopByPair(pair).orElseThrow(ExchangeRateNotFoundException::new);
     }
 }
